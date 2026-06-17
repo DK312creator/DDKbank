@@ -10,7 +10,7 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-const SITE_FOLDER = path.join(__dirname, '..', 'dkbank');
+const SITE_FOLDER = __dirname;
 const UPLOADS_FOLDER = path.join(SITE_FOLDER, 'uploads');
 
 if (!fs.existsSync(UPLOADS_FOLDER)) {
