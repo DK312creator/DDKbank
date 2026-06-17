@@ -1,0 +1,49 @@
+{
+  "DK356": {
+    "password": "Damerkaragat312",
+    "balance": 0,
+    "role": "Участник",
+    "avatar": "uploads/DK356_avatar.png",
+    "firstName": "Диана",
+    "lastName": "Рыспекова",
+    "email": "pasikogame@gmail.com",
+    "phone": "0708150309"
+  },
+  "Jora": {
+    "password": "jora",
+    "balance": 0
+  },
+  "DamerKaragatBank": {
+    "password": "DKmodedo312",
+    "balance": 1004020,
+    "role": "Участник",
+    "avatar": "",
+    "firstName": "",
+    "lastName": "",
+    "email": "",
+    "phone": ""
+  },
+  "Djjsshh": {
+    "password": "12345678",
+    "balance": 1,
+    "role": "Участник",
+    "avatar": "",
+    "firstName": "Дж",
+    "lastName": "Д",
+    "email": "",
+    "phone": "",
+    "banned": true,
+    "banCode": "1047",
+    "banReason": "Cheat"
+  },
+  "Fork": {
+    "password": "Fork",
+    "balance": 1,
+    "role": "Участник",
+    "avatar": "uploads/Fork_avatar.jpg",
+    "firstName": "Кадырбеков",
+    "lastName": "Шарфами",
+    "email": "",
+    "phone": ""
+  }
+}

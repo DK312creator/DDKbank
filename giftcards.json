@@ -1,0 +1,26 @@
+{
+  "DK100": {
+    "amount": 100,
+    "used": false
+  },
+  "DK500": {
+    "amount": 500,
+    "used": false
+  },
+  "DK1000": {
+    "amount": 1000,
+    "used": true
+  },
+  "DIANA": {
+    "amount": 777,
+    "used": true
+  },
+  "DAMER": {
+    "amount": 500,
+    "used": false
+  },
+  "BONUS": {
+    "amount": 50,
+    "used": false
+  }
+}

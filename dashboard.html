@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DKBank - Личный кабинет</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #1a0033, #0d1b3e);
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            padding-top: 20px;
+        }
+        
+        /* Верхний левый угол — аватар и ник */
+        .top-left {
+            position: absolute;
+            top: 25px;
+            left: 30px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .top-avatar {
+            width: 50px; height: 50px; border-radius: 50%;
+            border: 3px solid #ffd700; object-fit: cover;
+        }
+        .top-nick {
+            font-size: 20px; font-weight: bold; color: #ff6b6b;
+        }
+        
+        h1 { color: #ffd700; font-size: 28px; margin-top: 50px; margin-bottom: 5px; }
+        
+        .balance-card {
+            background: linear-gradient(135deg, #1a1a2e, #2a1a3e);
+            border: 2px solid #ffd700; border-radius: 20px; padding: 20px;
+            width: 280px; margin: 30px auto 20px;
+        }
+        .balance-card p { color: #aaa; font-size: 14px; }
+        .balance-card .amount { font-size: 44px; font-weight: bold; color: #ffd700; }
+        
+        .panel {
+            background-color: #1a1a2e; border-radius: 15px; padding: 20px;
+            width: 350px; margin: 15px auto; text-align: left;
+        }
+        .panel h3 { color: #ffd700; margin-bottom: 12px; text-align: center; }
+        .panel label { color: #aaa; font-size: 13px; display: block; margin-bottom: 5px; }
+        .panel input {
+            width: 100%; padding: 10px; font-size: 14px;
+            border: 2px solid #333; border-radius: 8px;
+            background-color: #0f0f1a; color: #ffd700;
+            margin-bottom: 10px; outline: none;
+        }
+        .panel input:focus { border-color: #ffd700; }
+        .panel button {
+            width: 100%; padding: 10px; font-size: 14px;
+            font-weight: bold; border: none; border-radius: 20px; cursor: pointer;
+        }
+        .btn-gift { background-color: #9b59b6; color: white; }
+        .btn-gift:hover { background-color: #8e44ad; }
+        .btn-delete { background-color: #e74c3c; color: white; }
+        .btn-delete:hover { background-color: #c0392b; }
+        
+        .nav-buttons { margin-top: 15px; }
+        .nav-btn {
+            display: inline-block; padding: 12px 25px; font-size: 16px;
+            font-weight: bold; border-radius: 25px; cursor: pointer;
+            text-decoration: none; margin: 5px;
+        }
+        .btn-payments { background-color: #ff6b6b; color: white; }
+        .btn-payments:hover { background-color: #ff5252; }
+        .btn-history { background-color: #ffd700; color: #0f0f1a; }
+        .btn-history:hover { background-color: #ffcc00; }
+        .btn-profile { background-color: #3498db; color: white; }
+        .btn-profile:hover { background-color: #2980b9; }
+        .btn-chat { background-color: #2ecc71; color: white; }
+        .btn-chat:hover { background-color: #27ae60; }
+        .btn-logout { background-color: #333; color: #aaa; border: none; }
+        .btn-logout:hover { background-color: #555; color: white; }
+        
+        .msg { text-align: center; font-weight: bold; min-height: 22px; margin-top: 8px; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <!-- Аватар и ник в левом верхнем углу -->
+    <div class="top-left">
+        <img id="topAvatar" class="top-avatar" src="" alt="Фото"
+             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22><rect fill=%22%23333%22 width=%2250%22 height=%2250%22/><text fill=%22%23aaa%22 x=%228%22 y=%2230%22 font-size=%2214%22>DK</text></svg>'">
+        <span class="top-nick" id="topNick">...</span>
+    </div>
+    
+    <h1><img src="DKbank.png" alt="DKBank" style="height: 200px; margin: 3px auto; display: block;"></h1>
+    
+    <div class="balance-card">
+        <p>Твой баланс</p>
+        <p class="amount">♎ <span id="displayBalance">0</span></p>
+    </div>
+    
+    <!-- Подарочная карта -->
+    <div class="panel">
+        <h3>🎁 Подарочная карта</h3>
+        <label>Код карты:</label>
+        <input id="giftCode" type="text" placeholder="Введи секретный код">
+        <button class="btn-gift" onclick="redeemGift()">Активировать 🎉</button>
+        <p class="msg" id="msgGift"></p>
+    </div>
+    
+    <!-- Удаление монет -->
+    <div class="panel">
+        <h3>🗑️ Удалить монеты</h3>
+        <label>Сколько удалить:</label>
+        <input id="deleteAmount" type="number" placeholder="Сумма для удаления" min="1">
+        <button class="btn-delete" onclick="deleteCoins()">Удалить 🗑️</button>
+        <p class="msg" id="msgDelete"></p>
+    </div>
+    
+    <!-- Навигация -->
+    <div class="nav-buttons">
+        <a href="payments.html" class="nav-btn btn-payments">💸 Платежи</a>
+        <a href="history.html" class="nav-btn btn-history">📜 История</a>
+        <br>
+        <a href="profile.html" class="nav-btn btn-profile">👤 Профиль</a>
+        <a href="chathelp_up.html" class="nav-btn btn-chat">💬 Помощник</a>
+        <br>
+        <button class="nav-btn btn-logout" onclick="logout()">🚪 Выйти</button>
+    </div>
+
+    <script>
+        const SERVER = 'http://10.66.10.29:3000';
+        var currentUser = localStorage.getItem("dkbank_logged_in");
+        if (!currentUser) window.location.href = "index.html";
+        
+        document.getElementById("topNick").innerHTML = currentUser;
+        loadProfile();
+        
+                        async function loadProfile() {
+            try {
+                var res = await fetch(SERVER + '/api/profile/' + currentUser);
+                var data = await res.json();
+                if (data.success) {
+                    document.getElementById("displayBalance").innerHTML = data.balance;
+                    if (data.avatar) {
+                        document.getElementById("topAvatar").src = SERVER + '/' + data.avatar + '?t=' + Date.now();
+                    }
+                }
+            } catch (e) {
+                document.getElementById("displayBalance").innerHTML = "Ошибка";
+            }
+        }
+        
+        async function redeemGift() {
+            var code = document.getElementById("giftCode").value.trim();
+            var msg = document.getElementById("msgGift");
+            if (!code) { msg.style.color = "#ff6b6b"; msg.innerHTML = "❌ Введи код!"; return; }
+            try {
+                var res = await fetch(SERVER + '/gift', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({nick:currentUser, code}) });
+                var data = await res.json();
+                msg.style.color = data.success ? "#4CAF50" : "#ff6b6b";
+                msg.innerHTML = data.success ? "🎉 " + data.message : "❌ " + data.message;
+                if (data.success) { loadProfile(); document.getElementById("giftCode").value=""; }
+            } catch (e) { msg.style.color = "#ff6b6b"; msg.innerHTML = "❌ Сервер не отвечает!"; }
+        }
+        
+        async function deleteCoins() {
+            var amount = parseInt(document.getElementById("deleteAmount").value);
+            var msg = document.getElementById("msgDelete");
+            if (isNaN(amount) || amount <= 0) { msg.style.color = "#ff6b6b"; msg.innerHTML = "❌ Введи сумму!"; return; }
+            try {
+                var res = await fetch(SERVER + '/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({nick:currentUser, amount}) });
+                var data = await res.json();
+                msg.style.color = data.success ? "#ffd700" : "#ff6b6b";
+                msg.innerHTML = data.success ? "🗑️ " + data.message : "❌ " + data.message;
+                if (data.success) loadProfile();
+            } catch (e) { msg.style.color = "#ff6b6b"; msg.innerHTML = "❌ Сервер не отвечает!"; }
+        }
+        
+        function logout() {
+            localStorage.removeItem("dkbank_logged_in");
+            window.location.href = "index.html";
+        }
+    </script>
+</body>
+</html>

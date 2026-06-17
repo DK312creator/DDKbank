@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Профиль</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #0f0f1a;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            padding-top: 50px;
+        }
+        .avatar-section { position: relative; display: inline-block; margin-bottom: 10px; }
+        .avatar-img {
+            width: 100px; height: 100px; border-radius: 50%;
+            border: 3px solid #ffd700; object-fit: cover;
+        }
+        .edit-btn {
+            position: absolute; bottom: 5px; right: 5px;
+            width: 36px; height: 36px; border-radius: 50%;
+            background-color: #ffd700; color: #0f0f1a; font-size: 18px;
+            text-decoration: none; display: flex; align-items: center;
+            justify-content: center; border: 2px solid #0f0f1a;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5); cursor: pointer;
+        }
+        .nickname { font-size: 22px; font-weight: bold; color: #ff6b6b; margin-bottom: 25px; }
+        .info-card {
+            background-color: #1a1a2e; border-radius: 15px; padding: 25px;
+            width: 340px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            text-align: left;
+        }
+        .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #333; }
+        .info-label { color: #aaa; font-size: 14px; }
+        .info-value { color: #ffd700; font-size: 14px; font-weight: bold; }
+        .back-link { display: inline-block; margin-top: 20px; color: #aaa; text-decoration: none; font-size: 14px; }
+        .back-link:hover { color: #ffd700; }
+    </style>
+</head>
+<body>
+
+    <div class="avatar-section">
+        <img id="avatarImg" class="avatar-img" src="" alt="Фото"
+             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text fill=%22%23aaa%22 x=%2220%22 y=%2255%22 font-size=%2220%22>Фото</text></svg>'">
+        <a href="edit_profile.html" class="edit-btn" title="Редактировать">✏️</a>
+    </div>
+    
+    <p class="nickname" id="displayNick">...</p>
+    
+    <div class="info-card">
+        <div class="info-row">
+            <span class="info-label">👤 Имя:</span>
+            <span class="info-value" id="infoFirstName">Неизвестно</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">👤 Фамилия:</span>
+            <span class="info-value" id="infoLastName">Неизвестно</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">📧 Почта:</span>
+            <span class="info-value" id="infoEmail">Неизвестно</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">📱 Телефон:</span>
+            <span class="info-value" id="infoPhone">Неизвестно</span>
+        </div>
+    </div>
+    
+    <a href="dashboard.html" class="back-link">← Назад в банк</a>
+
+    <script>
+        const SERVER = 'http://10.66.10.29:3000';
+        var currentUser = localStorage.getItem("dkbank_logged_in");
+        if (!currentUser) window.location.href = "index.html";
+        
+        document.getElementById("displayNick").innerHTML = currentUser;
+        loadProfile();
+        setInterval(loadProfile, 3000);
+        
+        async function loadProfile() {
+            try {
+                var res = await fetch(SERVER + '/api/profile/' + currentUser);
+                var data = await res.json();
+                if (data.success) {
+                    if (data.avatar) {
+                        document.getElementById("avatarImg").src = SERVER + '/' + data.avatar + '?t=' + Date.now();
+                    }
+                    document.getElementById("infoFirstName").innerHTML = data.firstName || 'Неизвестно';
+                    document.getElementById("infoLastName").innerHTML = data.lastName || 'Неизвестно';
+                    document.getElementById("infoEmail").innerHTML = data.email || 'Неизвестно';
+                    document.getElementById("infoPhone").innerHTML = data.phone || 'Неизвестно';
+                }
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>

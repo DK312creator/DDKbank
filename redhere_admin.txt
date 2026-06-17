@@ -1,0 +1,10 @@
+Запуск сервера DKbank 
+
+cd C:\Users\user\Desktop\dkbank-server
+node server.js
+
+Terminal Damer 
+
+cd C:\Users\user\Desktop\dkbank-server
+node bill.js
+

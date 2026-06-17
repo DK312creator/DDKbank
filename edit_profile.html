@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Редактировать профиль</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #0f0f1a;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            padding-top: 50px;
+        }
+        h2 { color: #ffd700; margin-bottom: 20px; }
+        .edit-card {
+            background-color: #1a1a2e;
+            border-radius: 20px;
+            padding: 25px;
+            width: 360px;
+            margin: 0 auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            text-align: left;
+        }
+        .edit-card label {
+            color: #aaa; font-size: 13px; display: block;
+            margin-bottom: 5px; margin-top: 12px;
+        }
+        .edit-card input {
+            width: 100%; padding: 10px; font-size: 14px;
+            border: 2px solid #333; border-radius: 8px;
+            background-color: #0f0f1a; color: #ffd700; outline: none;
+        }
+        .edit-card input:focus { border-color: #ffd700; }
+        .edit-card button {
+            width: 100%; margin-top: 10px; padding: 12px;
+            font-size: 16px; font-weight: bold; border: none;
+            border-radius: 25px; cursor: pointer;
+        }
+        .btn-save { background-color: #4CAF50; color: white; }
+        .btn-save:hover { background-color: #45a049; }
+        .btn-photo { background-color: #3498db; color: white; }
+        .btn-photo:hover { background-color: #2980b9; }
+        
+        .back-link {
+            display: inline-block; margin-top: 20px;
+            color: #aaa; text-decoration: none; font-size: 14px;
+        }
+        .back-link:hover { color: #ffd700; }
+        #message {
+            text-align: center; font-weight: bold;
+            margin-top: 15px; min-height: 22px; font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>✏️ Редактировать профиль</h2>
+    
+    <div class="edit-card">
+        <!-- Фото -->
+        <label>📷 Фото профиля (PNG, JPG):</label>
+        <input id="avatarFile" type="file" accept="image/*">
+        <button class="btn-photo" onclick="uploadAvatar()">Загрузить фото</button>
+        <p class="msg" id="msgPhoto"></p>
+        
+        <hr style="border-color: #333; margin: 15px 0;">
+        
+        <label>👤 Имя:</label>
+        <input id="firstName" type="text" placeholder="Введи имя">
+        
+        <label>👤 Фамилия:</label>
+        <input id="lastName" type="text" placeholder="Введи фамилию">
+        
+        <label>📧 Почта:</label>
+        <input id="email" type="email" placeholder="Введи почту">
+        
+        <label>📱 Телефон:</label>
+        <input id="phone" type="text" placeholder="Введи номер">
+        
+        <button class="btn-save" onclick="saveProfile()">💾 Сохранить</button>
+        
+        <p id="message"></p>
+    </div>
+    
+    <a href="profile.html" class="back-link">← Назад в профиль</a>
+
+    <script>
+        const SERVER = 'http://10.66.10.29:3000';
+        var currentUser = localStorage.getItem("dkbank_logged_in");
+        if (!currentUser) window.location.href = "index.html";
+        
+        loadCurrentData();
+        
+        async function loadCurrentData() {
+            try {
+                var res = await fetch(SERVER + '/api/profile/' + currentUser);
+                var data = await res.json();
+                if (data.success) {
+                    document.getElementById("firstName").value = data.firstName || '';
+                    document.getElementById("lastName").value = data.lastName || '';
+                    document.getElementById("email").value = data.email || '';
+                    document.getElementById("phone").value = data.phone || '';
+                }
+            } catch (e) {}
+        }
+        
+        async function uploadAvatar() {
+            var file = document.getElementById("avatarFile").files[0];
+            var msg = document.getElementById("msgPhoto");
+            if (!file) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Выбери файл!";
+                return;
+            }
+            var formData = new FormData();
+            formData.append("avatar", file);
+            formData.append("nick", currentUser);
+            
+            try {
+                var res = await fetch(SERVER + '/upload-avatar', { method: 'POST', body: formData });
+                var data = await res.json();
+                if (data.success) {
+                    msg.style.color = "#4CAF50";
+                    msg.innerHTML = "✅ Фото загружено!";
+                } else {
+                    msg.style.color = "#ff6b6b";
+                    msg.innerHTML = "❌ " + data.message;
+                }
+            } catch (e) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Ошибка загрузки!";
+            }
+        }
+        
+        async function saveProfile() {
+            var firstName = document.getElementById("firstName").value.trim();
+            var lastName = document.getElementById("lastName").value.trim();
+            var email = document.getElementById("email").value.trim();
+            var phone = document.getElementById("phone").value.trim();
+            var msg = document.getElementById("message");
+            
+            try {
+                var res = await fetch(SERVER + '/update-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nick: currentUser,
+                        firstName: firstName,
+                        lastName: lastName,
+                        email: email,
+                        phone: phone
+                    })
+                });
+                
+                var data = await res.json();
+                msg.style.color = data.success ? "#4CAF50" : "#ff6b6b";
+                msg.innerHTML = data.success ? "✅ Сохранено!" : "❌ " + data.message;
+            } catch (e) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Сервер не отвечает!";
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DKBank - Платежи</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #1a0033, #0d1b3e);
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            padding-top: 40px;
+        }
+        
+        img.logo { height: 60px; margin: 20px auto; display: block; }
+        
+        .panel {
+            background-color: #1a1a2e;
+            border-radius: 15px;
+            padding: 25px;
+            width: 380px;
+            margin: 15px auto;
+            text-align: left;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+        }
+        .panel h3 { color: #ffd700; margin-bottom: 15px; text-align: center; font-size: 18px; }
+        .panel label { color: #aaa; font-size: 13px; display: block; margin-bottom: 5px; }
+        .panel input, .panel select {
+            width: 100%; padding: 10px; font-size: 14px;
+            border: 2px solid #333; border-radius: 8px;
+            background-color: #0f0f1a; color: #ffd700;
+            margin-bottom: 12px; outline: none;
+        }
+        .panel input:focus, .panel select:focus { border-color: #ffd700; }
+        .panel button {
+            width: 100%; padding: 12px; font-size: 16px;
+            font-weight: bold; border: none; border-radius: 25px; cursor: pointer;
+            background-color: #ff6b6b; color: white;
+        }
+        .panel button:hover { background-color: #ff5252; }
+        
+        .btn-history {
+            display: inline-block; margin-top: 15px; padding: 10px 25px;
+            background-color: #ffd700; color: #0f0f1a;
+            text-decoration: none; font-weight: bold; border-radius: 25px;
+        }
+        .btn-history:hover { background-color: #ffcc00; }
+        
+        .msg { text-align: center; font-weight: bold; min-height: 22px; margin-top: 10px; font-size: 14px; }
+        
+        .back-link {
+            display: inline-block; margin-top: 15px;
+            color: #aaa; text-decoration: none; font-size: 14px;
+        }
+        .back-link:hover { color: #ffd700; }
+    </style>
+</head>
+<body>
+
+    <img src="Dkbanklogo.jpeg" alt="DKBank" class="logo">
+
+    <!-- Перевод внутри банка -->
+    <div class="panel">
+        <h3>💰 Перевод внутри банка</h3>
+        <label>Кому (ник):</label>
+        <input id="targetNick" type="text" placeholder="Введи ник получателя">
+        <label>Сумма (♎):</label>
+        <input id="sendAmount" type="number" placeholder="Сколько перевести" min="1">
+        <button onclick="sendMoney()">Отправить перевод →</button>
+        <p class="msg" id="msgSend"></p>
+    </div>
+    
+       <!-- Перевод единиц (Дамер) -->
+    <div class="panel">
+        <h3>💎 Перевод на карту/телефон (Дамер)</h3>
+        <label>Тип:</label>
+        <select id="unitType">
+            <option value="card">Номер карты</option>
+            <option value="phone">Номер телефона</option>
+            <option value="unit">Номер единицы</option>
+        </select>
+        <label>Номер получателя:</label>
+        <input id="unitNumber" type="text" placeholder="4196*** или +996***">
+        <label>Сумма (♎):</label>
+        <input id="unitAmount" type="number" placeholder="Сколько перевести" min="1">
+        <button onclick="sendToDamer()">Отправить Дамеру 📩</button>
+        <p class="msg" id="msgUnit"></p>
+    </div>
+    
+    <!-- История -->
+    <a href="history.html" class="btn-history">📜 История платежей</a>
+    <br>
+    <a href="dashboard.html" class="back-link">← Назад в банк</a>
+
+    <script>
+        const SERVER = 'http://10.66.10.29:3000';
+        var currentUser = localStorage.getItem("dkbank_logged_in");
+        if (!currentUser) window.location.href = "index.html";
+        
+        async function sendMoney() {
+            var target = document.getElementById("targetNick").value.trim();
+            var amount = parseInt(document.getElementById("sendAmount").value);
+            var msg = document.getElementById("msgSend");
+            
+            if (!target || isNaN(amount) || amount <= 0) {
+                msg.style.color = "#ff6b6b"; msg.innerHTML = "❌ Заполни поля!"; return;
+            }
+            if (target === currentUser) {
+                msg.style.color = "#ff6b6b"; msg.innerHTML = "❌ Нельзя себе!"; return;
+            }
+            try {
+                var res = await fetch(SERVER + '/transfer', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({from:currentUser, to:target, amount:amount})
+                });
+                var data = await res.json();
+                msg.style.color = data.success ? "#4CAF50" : "#ff6b6b";
+                msg.innerHTML = data.success ? "✅ Переведено ♎" + amount + " → " + target : "❌ " + (data.message || 'Ошибка');
+                if (data.success) {
+                    document.getElementById("sendAmount").value = "";
+                    document.getElementById("targetNick").value = "";
+                }
+            } catch (e) { msg.style.color = "#ff6b6b"; msg.innerHTML = "❌ Сервер не отвечает!"; }
+        }
+        
+                async function sendToDamer() {
+            var type = document.getElementById("unitType").value;
+            var number = document.getElementById("unitNumber").value.trim();
+            var amount = parseInt(document.getElementById("unitAmount").value);
+            var msg = document.getElementById("msgUnit");
+            
+            if (!number || isNaN(amount) || amount <= 0) {
+                msg.style.color = "#ff6b6b"; msg.innerHTML = "❌ Заполни поля!"; return;
+            }
+            
+            try {
+                var res = await fetch(SERVER + '/unit-transfer-request', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ from: currentUser, type: type, number: number, amount: amount })
+                });
+                var data = await res.json();
+                
+                if (data.success) {
+                    msg.style.color = "#4CAF50";
+                    msg.innerHTML = "✅ Списано ♎" + amount + "! Дамер получил заявку.";
+                    document.getElementById("unitNumber").value = "";
+                    document.getElementById("unitAmount").value = "";
+                } else {
+                    msg.style.color = "#ff6b6b";
+                    msg.innerHTML = "❌ " + data.message;
+                }
+            } catch (e) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Сервер не отвечает!";
+            }
+        }
+    </script>
+</body>
+</html>

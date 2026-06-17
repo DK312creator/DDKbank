@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DKBank - Вход</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #0f0f1a;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            padding-top: 80px;
+        }
+        h1 { color: #ffd700; font-size: 40px; margin-bottom: 10px; }
+        .subtitle { color: #aaa; margin-bottom: 30px; }
+        .form-box {
+            background-color: #1a1a2e;
+            border-radius: 20px;
+            padding: 30px;
+            width: 350px;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        .form-box label {
+            display: block; text-align: left; color: #aaa;
+            margin-bottom: 5px; font-size: 14px;
+        }
+        .form-box input {
+            width: 100%; padding: 12px; font-size: 16px;
+            border: 2px solid #333; border-radius: 10px;
+            background-color: #0f0f1a; color: #ffd700;
+            margin-bottom: 20px; outline: none;
+        }
+        .form-box input:focus { border-color: #ffd700; }
+        .form-box button {
+            width: 100%; background-color: #ff6b6b; color: white;
+            border: none; padding: 14px; font-size: 18px;
+            font-weight: bold; border-radius: 25px; cursor: pointer; margin-top: 10px;
+        }
+        .form-box button:hover { background-color: #ff5252; }
+        .link { margin-top: 20px; color: #aaa; }
+        .link a { color: #4CAF50; text-decoration: none; font-weight: bold; }
+        .link a:hover { text-decoration: underline; }
+        #message { margin-top: 15px; font-weight: bold; min-height: 25px; }
+    </style>
+</head>
+<body>
+
+    <h1><img src="DKbank.png" alt="DKBank" style="height: 200px; margin: 3px auto; display: block;"></h1>
+    <p class="subtitle">Вход в аккаунт</p>
+    
+    <div class="form-box">
+        <label>👤 Никнейм:</label>
+        <input id="nickname" type="text" placeholder="Введи ник">
+        
+        <label>🔒 Пароль:</label>
+        <input id="password" type="password" placeholder="Введи пароль">
+        
+        <button onclick="login()">🚪 Войти</button>
+        
+        <p id="message"></p>
+    </div>
+    
+    <p class="link">Нет аккаунта? <a href="register.html">Зарегистрироваться</a></p>
+
+        <script>
+        const SERVER = 'http://10.66.10.29:3000';
+        
+        var loggedIn = localStorage.getItem("dkbank_logged_in");
+        if (loggedIn !== null) {
+            window.location.href = "dashboard.html";
+        }
+        
+        async function login() {
+            var nick = document.getElementById("nickname").value.trim();
+            var pass = document.getElementById("password").value;
+            var msg = document.getElementById("message");
+            
+            if (nick === "" || pass === "") {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Заполни все поля!";
+                return;
+            }
+            
+            try {
+                var response = await fetch(SERVER + '/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nick: nick, password: pass })
+                });
+                
+                var data = await response.json();
+                
+                if (data.banned) {
+                    document.body.innerHTML = `
+                        <div style="
+                            background-color: #0000aa;
+                            color: white;
+                            font-family: 'Courier New', monospace;
+                            text-align: center;
+                            padding: 80px 20px;
+                            min-height: 100vh;
+                        ">
+                            <h1 style="font-size: 60px;">:(</h1>
+                            <h2 style="font-size: 24px; margin: 20px 0;">ВАШ АККАУНТ ЗАБЛОКИРОВАН</h2>
+                            <p style="font-size: 18px;">Код ошибки: <b>BAN-${data.banCode}</b></p>
+                            <p style="font-size: 16px; margin: 20px; color: #aaa;">Причина: ${data.banReason}</p>
+                            <p style="font-size: 14px; margin-top: 40px; color: #888;">Обратитесь в службу поддержки</p>
+                            <button onclick="logoutBan()" style="
+                                margin-top: 30px; padding: 10px 30px;
+                                font-size: 16px; background: #333; color: white;
+                                border: none; border-radius: 10px; cursor: pointer;
+                            ">Понятно</button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                if (data.success) {
+                    localStorage.setItem("dkbank_logged_in", nick);
+                    msg.style.color = "#4CAF50";
+                    msg.innerHTML = "✅ Вход выполнен!";
+                    setTimeout(function() {
+                        window.location.href = "dashboard.html";
+                    }, 800);
+                } else {
+                    msg.style.color = "#ff6b6b";
+                    msg.innerHTML = "❌ " + data.message;
+                }
+            } catch (e) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Сервер не отвечает!";
+            }
+        }
+        
+        function logoutBan() {
+            localStorage.removeItem("dkbank_logged_in");
+            window.location.href = "index.html";
+        }
+    </script>
+
+</body>
+</html>

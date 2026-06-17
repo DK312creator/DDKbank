@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DKBank - Регистрация</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #0f0f1a;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            padding-top: 80px;
+        }
+        h1 { color: #ffd700; font-size: 40px; margin-bottom: 10px; }
+        .subtitle { color: #aaa; margin-bottom: 30px; }
+        .form-box {
+            background-color: #1a1a2e;
+            border-radius: 20px;
+            padding: 30px;
+            width: 350px;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        .form-box label {
+            display: block; text-align: left; color: #aaa;
+            margin-bottom: 5px; font-size: 14px;
+        }
+        .form-box input {
+            width: 100%; padding: 12px; font-size: 16px;
+            border: 2px solid #333; border-radius: 10px;
+            background-color: #0f0f1a; color: #ffd700;
+            margin-bottom: 20px; outline: none;
+        }
+        .form-box input:focus { border-color: #ffd700; }
+        .form-box button {
+            width: 100%; background-color: #4CAF50; color: white;
+            border: none; padding: 14px; font-size: 18px;
+            font-weight: bold; border-radius: 25px; cursor: pointer; margin-top: 10px;
+        }
+        .form-box button:hover { background-color: #45a049; }
+        .link { margin-top: 20px; color: #aaa; }
+        .link a { color: #ff6b6b; text-decoration: none; font-weight: bold; }
+        .link a:hover { text-decoration: underline; }
+        #message { margin-top: 15px; font-weight: bold; min-height: 25px; }
+    </style>
+</head>
+<body>
+
+    <h1>🏦 DKBank</h1>
+    <p class="subtitle">Регистрация нового аккаунта</p>
+    
+    <div class="form-box">
+        <label>👤 Никнейм (английские буквы):</label>
+        <input id="nickname" type="text" placeholder="Например: DK356" maxlength="20">
+        
+        <label>🔒 Пароль:</label>
+        <input id="password" type="password" placeholder="Придумай пароль" maxlength="20">
+        
+        <label>🔒 Повтори пароль:</label>
+        <input id="password2" type="password" placeholder="Повтори пароль" maxlength="20">
+        
+        <button onclick="register()">📝 Зарегистрироваться</button>
+        
+        <p id="message"></p>
+    </div>
+    
+    <p class="link">Уже есть аккаунт? <a href="index.html">Войти</a></p>
+
+    <script>
+        const SERVER = 'http://10.66.10.29:3000';
+        
+        async function register() {
+            var nick = document.getElementById("nickname").value.trim();
+            var pass = document.getElementById("password").value;
+            var pass2 = document.getElementById("password2").value;
+            var msg = document.getElementById("message");
+            
+            if (nick === "" || pass === "") {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Заполни все поля!";
+                return;
+            }
+            
+            if (nick.length < 3) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Ник должен быть минимум 3 символа!";
+                return;
+            }
+            
+            var englishPattern = /^[a-zA-Z0-9]+$/;
+            if (!englishPattern.test(nick)) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Ник только английскими буквами и цифрами!";
+                return;
+            }
+            
+            if (pass !== pass2) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Пароли не совпадают!";
+                return;
+            }
+            
+            if (pass.length < 4) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Пароль минимум 4 символа!";
+                return;
+            }
+            
+            // Отправляем на сервер
+            try {
+                var response = await fetch(SERVER + '/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nick: nick, password: pass })
+                });
+                
+                var data = await response.json();
+                
+                if (data.success) {
+                    localStorage.setItem("dkbank_logged_in", nick);
+                    msg.style.color = "#4CAF50";
+                    msg.innerHTML = "✅ Аккаунт создан! Перенаправляем...";
+                    setTimeout(function() {
+                        window.location.href = "dashboard.html";
+                    }, 1000);
+                } else {
+                    msg.style.color = "#ff6b6b";
+                    msg.innerHTML = "❌ " + data.message;
+                }
+            } catch (e) {
+                msg.style.color = "#ff6b6b";
+                msg.innerHTML = "❌ Сервер не отвечает! Запусти сервер!";
+            }
+        }
+    </script>
+
+</body>
+</html>

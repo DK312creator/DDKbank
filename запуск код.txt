@@ -1,0 +1,2 @@
+cd C:\Users\ryspe\OneDrive\Desktop\dkbank-server
+node server.js

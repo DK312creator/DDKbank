@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DKBank - Помощник</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #0f0f1a;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            padding-top: 40px;
+        }
+        h1 { color: #ffd700; font-size: 28px; margin-bottom: 5px; }
+        .subtitle { color: #aaa; font-size: 14px; margin-bottom: 20px; }
+        
+        .chat-box {
+            background-color: #1a1a2e;
+            border-radius: 15px;
+            padding: 20px;
+            width: 380px;
+            margin: 0 auto;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+            text-align: left;
+        }
+        .messages {
+            background-color: #0f0f1a;
+            border-radius: 10px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        .msg-bot { color: #ffd700; margin: 5px 0; }
+        .msg-user { color: #ccc; margin: 5px 0; }
+        .msg-admin { color: #4CAF50; margin: 5px 0; }
+        .msg-system { color: #888; margin: 5px 0; font-style: italic; }
+        
+        .input-row {
+            display: flex;
+            gap: 5px;
+        }
+        .input-row input {
+            flex: 1;
+            padding: 10px;
+            font-size: 14px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background-color: #0f0f1a;
+            color: #ffd700;
+            outline: none;
+        }
+        .input-row input:focus { border-color: #ffd700; }
+        .input-row button {
+            padding: 10px 15px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: #ff6b6b;
+            color: white;
+        }
+        .input-row button:hover { background-color: #ff5252; }
+        
+        .btn-support {
+            width: 100%;
+            margin-top: 10px;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            background-color: #e67e22;
+            color: white;
+        }
+        .btn-support:hover { background-color: #d35400; }
+        
+        .btn-close {
+            width: 100%;
+            margin-top: 5px;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            background-color: #555;
+            color: #ccc;
+        }
+        .btn-close:hover { background-color: #777; }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #aaa;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .back-link:hover { color: #ffd700; }
+    </style>
+</head>
+<body>
+
+    <h1>💬 Помощник DKBank</h1>
+    <p class="subtitle">Задай вопрос — бот ответит</p>
+    
+    <div class="chat-box">
+        <div class="messages" id="chatMessages">
+            <p class="msg-bot">🤖 <b>Бот:</b> Привет! Я помощник DKBank. Задай мне вопрос или нажми "Служба поддержки" для связи с оператором.</p>
+        </div>
+        
+        <div class="input-row">
+            <input id="chatInput" type="text" placeholder="Напиши сообщение..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">▶</button>
+        </div>
+        
+        <button class="btn-support" id="btnSupport" onclick="callSupport()">📞 Служба поддержки</button>
+        <button class="btn-close" id="btnClose" onclick="closeSupport()" style="display: none;">✅ Завершить общение с поддержкой</button>
+    </div>
+    
+    <a href="dashboard.html" class="back-link">← Назад в банк</a>
+
+    <script>
+        const SERVER = 'http://10.66.10.29:3000';
+        var currentUser = localStorage.getItem("dkbank_logged_in");
+        if (!currentUser) window.location.href = "index.html";
+        
+        var supportMode = false;
+        
+        loadMessages();
+        setInterval(loadMessages, 2000);
+        
+        async function sendMessage() {
+            var input = document.getElementById("chatInput");
+            var msg = input.value.trim();
+            if (!msg) return;
+            
+            addMessage("user", msg);
+            input.value = "";
+            
+            try {
+                var res = await fetch(SERVER + '/chat/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nick: currentUser, message: msg })
+                });
+                var data = await res.json();
+                
+                if (data.botReply && !supportMode) {
+                    setTimeout(function() {
+                        addMessage("bot", data.botReply);
+                    }, 500);
+                }
+            } catch (e) {
+                addMessage("system", "❌ Ошибка отправки");
+            }
+        }
+        
+        function addMessage(type, text) {
+            var box = document.getElementById("chatMessages");
+            var p = document.createElement("p");
+            if (type === "bot") {
+                p.className = "msg-bot";
+                p.innerHTML = "🤖 <b>Бот:</b> " + text;
+            } else if (type === "user") {
+                p.className = "msg-user";
+                p.innerHTML = "💬 <b>Вы:</b> " + text;
+            } else if (type === "admin") {
+                p.className = "msg-admin";
+                p.innerHTML = "👑 <b>Поддержка:</b> " + text;
+            } else {
+                p.className = "msg-system";
+                p.innerHTML = text;
+            }
+            box.appendChild(p);
+            box.scrollTop = box.scrollHeight;
+        }
+        
+        async function loadMessages() {
+            try {
+                var res = await fetch(SERVER + '/chat/messages/' + currentUser);
+                var data = await res.json();
+                if (data.success) {
+                    if (data.adminReplies && data.adminReplies.length > 0) {
+                        for (var i = 0; i < data.adminReplies.length; i++) {
+                            addMessage("admin", data.adminReplies[i].text);
+                        }
+                    }
+                    if (data.closed) {
+                        supportMode = false;
+                        document.getElementById("btnSupport").style.display = "block";
+                        document.getElementById("btnClose").style.display = "none";
+                        addMessage("system", "📞 Общение с поддержкой завершено. Бот снова с вами.");
+                    }
+                }
+            } catch (e) {}
+        }
+        
+        async function callSupport() {
+            try {
+                await fetch(SERVER + '/chat/call-operator', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nick: currentUser })
+                });
+                supportMode = true;
+                document.getElementById("btnSupport").style.display = "none";
+                document.getElementById("btnClose").style.display = "block";
+                addMessage("system", "📞 Вызов отправлен. Ожидайте ответа службы поддержки.");
+            } catch (e) {
+                addMessage("system", "❌ Не удалось вызвать поддержку");
+            }
+        }
+        
+        async function closeSupport() {
+            try {
+                await fetch(SERVER + '/chat/close', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nick: currentUser })
+                });
+                supportMode = false;
+                document.getElementById("btnSupport").style.display = "block";
+                document.getElementById("btnClose").style.display = "none";
+                addMessage("system", "✅ Вы завершили общение с поддержкой.");
+                addMessage("bot", "Я снова здесь! Чем могу помочь?");
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>
