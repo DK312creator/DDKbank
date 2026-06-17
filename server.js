@@ -230,13 +230,48 @@ app.post('/chat/call-operator', (req, res) => {
     res.json({ success: true });
 });
 
-// ========== API ДЛЯ ТЕРМИНАЛА ДАМЕРА ==========
+// ========== API ДЛЯ ТЕРМИНАЛА ДАМЕРА (защищённый) ==========
 const DAMER_KEY = 'damersecret123';
 
+// Проверка ключа
+function checkKey(req, res) {
+    const key = req.query.key || (req.body && req.body.key);
+    if (key !== DAMER_KEY) {
+        res.json({ success: false, message: 'Доступ запрещён!' });
+        return false;
+    }
+    return true;
+}
+
 app.get('/damer-queue-data', (req, res) => {
-    if (req.query.key !== DAMER_KEY) return res.json({ success: false, message: 'Доступ запрещён!' });
+    if (!checkKey(req, res)) return;
     const queue = loadQueue();
     res.json({ success: true, requests: queue.filter(r => !r.shown) });
+});
+
+app.post('/damer-done', (req, res) => {
+    if (!checkKey(req, res)) return;
+    const { nick } = req.body;
+    const queue = loadQueue();
+    const newQueue = queue.filter(r => !(r.from === nick));
+    saveQueue(newQueue);
+    console.log('✅ Дамер выполнил: ' + nick);
+    res.json({ success: true });
+});
+
+app.post('/damer-refund', (req, res) => {
+    if (!checkKey(req, res)) return;
+    const { nick, amount } = req.body;
+    const users = loadUsers();
+    if (users[nick]) {
+        users[nick].balance += parseInt(amount);
+        saveUsers(users);
+    }
+    const queue = loadQueue();
+    const newQueue = queue.filter(r => !(r.from === nick && r.amount === parseInt(amount)));
+    saveQueue(newQueue);
+    console.log('🔙 Возврат: ' + nick + ' | ♎' + amount);
+    res.json({ success: true });
 });
 
 app.post('/damer-done', (req, res) => {
