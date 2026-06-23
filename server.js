@@ -2,110 +2,195 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const multer = require('multer');
-const readline = require('readline');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
+// ===== НАСТРОЙКИ GITHUB =====
+const GITHUB_TOKEN = 'СЮДА_ВСТАВЬ_СВОЙ_ТОКЕН'; // ← ЗАМЕНИ НА СВОЙ ТОКЕН
+const GITHUB_USER = 'ТВОЙ_НИК_НА_GITHUB'; // ← ЗАМЕНИ НА СВОЙ НИК
+const GITHUB_REPO = 'dkbank'; // ← ТВОЙ РЕПОЗИТОРИЙ
+const GITHUB_BRANCH = 'main';
+const DATA_FILES = ['users.json', 'bills.json', 'chats.json', 'damer-queue.json', 'log_info.txt', 'giftcards.json'];
+
+// Функция загрузки файла с GitHub
+function downloadFromGitHub(filename) {
+    return new Promise((resolve, reject) => {
+        const url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${filename}`;
+        https.get(url, {
+            headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'DKBank' }
+        }, (res) => {
+            if (res.statusCode === 404) { resolve(null); return; }
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => resolve(data));
+        }).on('error', () => resolve(null));
+    });
+}
+
+// Функция загрузки файла на GitHub
+function uploadToGitHub(filename, content) {
+    return new Promise((resolve) => {
+        // Сначала получаем SHA файла
+        const getUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${filename}`;
+        const getOptions = {
+            method: 'GET',
+            headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'DKBank' }
+        };
+        
+        https.get(getUrl, getOptions, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                let sha = null;
+                try { sha = JSON.parse(data).sha; } catch(e) {}
+                
+                const body = JSON.stringify({
+                    message: `Update ${filename}`,
+                    content: Buffer.from(content).toString('base64'),
+                    branch: GITHUB_BRANCH,
+                    ...(sha ? { sha } : {})
+                });
+                
+                const putOptions = {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${GITHUB_TOKEN}`,
+                        'User-Agent': 'DKBank',
+                        'Content-Type': 'application/json',
+                        'Content-Length': body.length
+                    }
+                };
+                
+                const req = https.request(getUrl, putOptions);
+                req.write(body);
+                req.end();
+                resolve();
+            });
+        });
+    });
+}
+
+// Загрузка всех данных при запуске
+async function loadAllData() {
+    console.log('📥 Загрузка данных с GitHub...');
+    for (const filename of DATA_FILES) {
+        const data = await downloadFromGitHub(filename);
+        if (data !== null) {
+            fs.writeFileSync(path.join(__dirname, filename), data);
+            console.log('   ✅ ' + filename);
+        } else {
+            console.log('   📄 ' + filename + ' (новый)');
+            if (filename === 'users.json') fs.writeFileSync(path.join(__dirname, filename), '{}');
+            else if (filename === 'bills.json' || filename === 'damer-queue.json') fs.writeFileSync(path.join(__dirname, filename), '[]');
+            else if (filename === 'giftcards.json') {
+                const cards = { DK100: { amount: 100, used: false }, DK500: { amount: 500, used: false }, DK1000: { amount: 1000, used: false }, DIANA: { amount: 777, used: false }, DAMER: { amount: 500, used: false }, BONUS: { amount: 50, used: false } };
+                fs.writeFileSync(path.join(__dirname, filename), JSON.stringify(cards, null, 2));
+            }
+        }
+    }
+    console.log('✅ Данные загружены!\n');
+}
+
+// Сохранение всех данных на GitHub
+let saveTimeout = null;
+function scheduleSave() {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(async () => {
+        console.log('📤 Сохранение на GitHub...');
+        for (const filename of DATA_FILES) {
+            if (fs.existsSync(path.join(__dirname, filename))) {
+                const content = fs.readFileSync(path.join(__dirname, filename), 'utf8');
+                await uploadToGitHub(filename, content);
+            }
+        }
+        console.log('✅ Сохранено!');
+    }, 2000);
+}
 
 app.use(cors());
 app.use(express.json());
 
-const SITE_FOLDER = __dirname;
-const UPLOADS_FOLDER = path.join(SITE_FOLDER, 'uploads');
-
-if (!fs.existsSync(UPLOADS_FOLDER)) {
-    fs.mkdirSync(UPLOADS_FOLDER, { recursive: true });
-}
-
-app.use(express.static(SITE_FOLDER));
+const UPLOADS_FOLDER = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_FOLDER)) fs.mkdirSync(UPLOADS_FOLDER, { recursive: true });
+app.use(express.static(__dirname));
 app.use('/uploads', express.static(UPLOADS_FOLDER));
 
 const storage = multer.diskStorage({
     destination: UPLOADS_FOLDER,
-    filename: function(req, file, cb) {
+    filename: (req, file, cb) => {
         const nick = req.body.nick || 'temp_' + Date.now();
-        const ext = path.extname(file.originalname);
-        cb(null, nick + '_avatar' + ext);
+        cb(null, nick + '_avatar' + path.extname(file.originalname));
     }
 });
-const upload = multer({ storage: storage });
-
-const USERS_FILE = path.join(__dirname, 'users.json');
-const LOG_FILE = path.join(__dirname, 'log_info.txt');
-const CHAT_FILE = path.join(__dirname, 'chats.json');
-const BILLS_FILE = path.join(__dirname, 'bills.json');
-const GIFTS_FILE = path.join(__dirname, 'giftcards.json');
-const QUEUE_FILE = path.join(__dirname, 'damer-queue.json');
+const upload = multer({ storage });
 
 function loadJSON(file) {
     try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-    catch (e) { return (file === BILLS_FILE || file === QUEUE_FILE) ? [] : {}; }
+    catch(e) { return (file.includes('bills') || file.includes('queue')) ? [] : {}; }
 }
-function saveJSON(file, data) { fs.writeFileSync(file, JSON.stringify(data, null, 2)); }
 
-function loadUsers() { return loadJSON(USERS_FILE); }
-function saveUsers(u) { saveJSON(USERS_FILE, u); }
-function loadChats() { return loadJSON(CHAT_FILE); }
-function saveChats(c) { saveJSON(CHAT_FILE, c); }
-function loadGifts() { return loadJSON(GIFTS_FILE); }
-function saveGifts(g) { saveJSON(GIFTS_FILE, g); }
-function loadQueue() { return loadJSON(QUEUE_FILE); }
-function saveQueue(q) { saveJSON(QUEUE_FILE, q); }
+function loadUsers() { return loadJSON(path.join(__dirname, 'users.json')); }
+function saveUsers(u) { fs.writeFileSync(path.join(__dirname, 'users.json'), JSON.stringify(u, null, 2)); scheduleSave(); }
+function loadChats() { return loadJSON(path.join(__dirname, 'chats.json')); }
+function saveChats(c) { fs.writeFileSync(path.join(__dirname, 'chats.json'), JSON.stringify(c, null, 2)); scheduleSave(); }
+function loadQueue() { return loadJSON(path.join(__dirname, 'damer-queue.json')); }
+function saveQueue(q) { fs.writeFileSync(path.join(__dirname, 'damer-queue.json'), JSON.stringify(q, null, 2)); scheduleSave(); }
+function saveBills(b) { fs.writeFileSync(path.join(__dirname, 'bills.json'), JSON.stringify(b, null, 2)); scheduleSave(); }
 
 function logRegistration(nick, password) {
     const date = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    fs.appendFileSync(LOG_FILE, '[' + date + '] Ник: ' + nick + ' | Пароль: ' + password + '\n');
+    fs.appendFileSync(path.join(__dirname, 'log_info.txt'), `[${date}] ${nick} | ${password}\n`);
+    scheduleSave();
 }
 
+// Бот
 function botReply(msg) {
     msg = msg.toLowerCase();
-    if (msg.includes('привет') || msg.includes('здрав')) return 'Привет!';
-    if (msg.includes('баланс')) return 'Баланс в личном кабинете.';
-    if (msg.includes('перевод')) return 'Переводы в разделе "Платежи".';
-    if (msg.includes('подар') || msg.includes('код')) return 'Коды: DK100, DK500, DK1000, DIANA, DAMER, BONUS.';
-    if (msg.includes('спасиб')) return 'Всегда пожалуйста!';
-    return 'Нажмите "Служба поддержки".';
+    if (msg.includes('привет')) return 'Привет!';
+    if (msg.includes('баланс')) return 'Баланс в кабинете.';
+    if (msg.includes('перевод')) return 'В разделе Платежи.';
+    return 'Нажмите Служба поддержки.';
 }
 
-// ========== СТРАНИЦЫ ==========
-app.get('/', (req, res) => res.sendFile(path.join(SITE_FOLDER, 'index.html')));
-app.get('/dashboard', (req, res) => res.sendFile(path.join(SITE_FOLDER, 'dashboard.html')));
-app.get('/profile', (req, res) => res.sendFile(path.join(SITE_FOLDER, 'profile.html')));
-app.get('/edit-profile', (req, res) => res.sendFile(path.join(SITE_FOLDER, 'edit_profile.html')));
-app.get('/chat', (req, res) => res.sendFile(path.join(SITE_FOLDER, 'chathelp_up.html')));
-app.get('/payments', (req, res) => res.sendFile(path.join(SITE_FOLDER, 'payments.html')));
-app.get('/history', (req, res) => res.sendFile(path.join(SITE_FOLDER, 'history.html')));
+// ===== СТРАНИЦЫ =====
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
+app.get('/profile', (req, res) => res.sendFile(path.join(__dirname, 'profile.html')));
+app.get('/edit-profile', (req, res) => res.sendFile(path.join(__dirname, 'edit_profile.html')));
+app.get('/chat', (req, res) => res.sendFile(path.join(__dirname, 'chathelp_up.html')));
+app.get('/payments', (req, res) => res.sendFile(path.join(__dirname, 'payments.html')));
+app.get('/history', (req, res) => res.sendFile(path.join(__dirname, 'history.html')));
 
-// ========== РЕГИСТРАЦИЯ ==========
+// ===== РЕГИСТРАЦИЯ =====
 app.post('/register', (req, res) => {
     const { nick, password } = req.body;
     const users = loadUsers();
-    if (users[nick]) return res.json({ success: false, message: 'Ник уже занят!' });
+    if (users[nick]) return res.json({ success: false, message: 'Ник занят!' });
     users[nick] = { password, balance: 0, role: 'Участник', avatar: '', firstName: '', lastName: '', email: '', phone: '' };
     saveUsers(users);
     logRegistration(nick, password);
     res.json({ success: true });
 });
 
-// ========== ВХОД ==========
+// ===== ВХОД =====
 app.post('/login', (req, res) => {
     const { nick, password } = req.body;
     const users = loadUsers();
-    if (!users[nick]) return res.json({ success: false, message: 'Аккаунт не найден!' });
-    if (users[nick].banned) return res.json({ success: false, banned: true, banCode: users[nick].banCode || '0', banReason: users[nick].banReason || 'Нарушение' });
+    if (!users[nick]) return res.json({ success: false, message: 'Не найден!' });
+    if (users[nick].banned) return res.json({ success: false, banned: true });
     if (users[nick].password !== password) return res.json({ success: false, message: 'Неверный пароль!' });
-    res.json({ success: true, balance: users[nick].balance, role: users[nick].role, avatar: users[nick].avatar });
+    res.json({ success: true, ...users[nick] });
 });
 
-// ========== АВАТАР ==========
+// ===== АВАТАР =====
 app.post('/upload-avatar', upload.single('avatar'), (req, res) => {
     const nick = req.body.nick;
-    if (!nick) return res.json({ success: false, message: 'Ник не указан!' });
+    if (!nick || !req.file) return res.json({ success: false, message: 'Ошибка!' });
     const users = loadUsers();
-    if (!users[nick]) return res.json({ success: false, message: 'Пользователь не найден' });
-    if (!req.file) return res.json({ success: false, message: 'Файл не выбран!' });
-    const ext = path.extname(req.file.originalname);
-    const newName = nick + '_avatar' + ext;
+    if (!users[nick]) return res.json({ success: false });
+    const newName = nick + '_avatar' + path.extname(req.file.originalname);
     const newPath = path.join(UPLOADS_FOLDER, newName);
     if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
     fs.renameSync(req.file.path, newPath);
@@ -114,11 +199,10 @@ app.post('/upload-avatar', upload.single('avatar'), (req, res) => {
     res.json({ success: true });
 });
 
-// ========== ПРОФИЛЬ ==========
+// ===== ПРОФИЛЬ =====
 app.get('/api/profile/:nick', (req, res) => {
     const users = loadUsers();
-    if (!users[req.params.nick]) return res.json({ success: false });
-    res.json({ success: true, ...users[req.params.nick] });
+    res.json({ success: !!users[req.params.nick], ...(users[req.params.nick] || {}) });
 });
 
 app.post('/update-profile', (req, res) => {
@@ -134,210 +218,114 @@ app.post('/update-profile', (req, res) => {
     res.json({ success: true });
 });
 
-// ========== ПЕРЕВОД ВНУТРИ БАНКА ==========
+// ===== ПЕРЕВОД =====
 app.post('/transfer', (req, res) => {
     const { from, to, amount } = req.body;
     const users = loadUsers();
     if (!users[from]) return res.json({ success: false, message: 'Отправитель не найден!' });
     if (!users[to]) return res.json({ success: false, message: 'Получатель не найден!' });
-    if (users[from].balance < amount) return res.json({ success: false, message: 'Недостаточно средств!' });
+    if (users[from].balance < amount) return res.json({ success: false, message: 'Недостаточно!' });
     users[from].balance -= amount;
     users[to].balance += amount;
     saveUsers(users);
-    const bills = loadJSON(BILLS_FILE);
+    const bills = loadJSON(path.join(__dirname, 'bills.json'));
     bills.push({ type: 'transfer', from, to, amount, date: new Date().toISOString().replace('T', ' ').slice(0, 19) });
-    saveJSON(BILLS_FILE, bills);
-    res.json({ success: true, message: 'Перевод выполнен!' });
-});
-
-// ========== ЗАЯВКА ДАМЕРУ (списание сразу) ==========
-app.post('/unit-transfer-request', (req, res) => {
-    const { from, type, number, amount } = req.body;
-    const users = loadUsers();
-    if (!users[from]) return res.json({ success: false, message: 'Отправитель не найден!' });
-    if (users[from].balance < amount) return res.json({ success: false, message: 'Недостаточно средств!' });
-    users[from].balance -= amount;
-    saveUsers(users);
-    const bills = loadJSON(BILLS_FILE);
-    bills.push({ type: 'unit_transfer', from, to: 'Дамер', amount, number, date: new Date().toISOString().replace('T', ' ').slice(0, 19) });
-    saveJSON(BILLS_FILE, bills);
-    const queue = loadQueue();
-    queue.push({ from, type, number, amount, shown: false, date: new Date().toISOString().replace('T', ' ').slice(0, 19) });
-    saveQueue(queue);
-    console.log('💎 Дамер: ' + from + ' | ♎' + amount);
-    res.json({ success: true, message: 'Списано ♎' + amount });
-});
-
-// ========== ПОДАРОЧНАЯ КАРТА ==========
-app.post('/gift', (req, res) => {
-    const { nick, code } = req.body;
-    const users = loadUsers();
-    const cards = loadGifts();
-    if (!cards[code]) return res.json({ success: false, message: 'Нет такой карты!' });
-    if (cards[code].used) return res.json({ success: false, message: 'Уже использована!' });
-    users[nick].balance += cards[code].amount;
-    cards[code].used = true;
-    saveUsers(users);
-    saveGifts(cards);
-    res.json({ success: true, message: '+' + cards[code].amount + ' ♎' });
-});
-
-// ========== УДАЛЕНИЕ ==========
-app.post('/delete', (req, res) => {
-    const { nick, amount } = req.body;
-    const users = loadUsers();
-    if (users[nick].balance < amount) return res.json({ success: false, message: 'Недостаточно!' });
-    users[nick].balance -= amount;
-    saveUsers(users);
+    saveBills(bills);
     res.json({ success: true });
 });
 
-// ========== ИСТОРИЯ ==========
-app.get('/api/history/:nick', (req, res) => {
-    const bills = loadJSON(BILLS_FILE);
-    const transactions = bills.filter(b => b.from === req.params.nick || b.to === req.params.nick).reverse();
-    res.json({ success: true, transactions });
+// ===== ПОДАРОЧНАЯ КАРТА =====
+app.post('/gift', (req, res) => {
+    const { nick, code } = req.body;
+    const users = loadUsers();
+    const cards = loadJSON(path.join(__dirname, 'giftcards.json'));
+    if (!cards[code]) return res.json({ success: false, message: 'Нет карты!' });
+    if (cards[code].used) return res.json({ success: false, message: 'Использована!' });
+    users[nick].balance += cards[code].amount;
+    cards[code].used = true;
+    saveUsers(users);
+    fs.writeFileSync(path.join(__dirname, 'giftcards.json'), JSON.stringify(cards, null, 2));
+    scheduleSave();
+    res.json({ success: true, message: '+' + cards[code].amount + ' ♎' });
 });
 
-// ========== ЧАТ ==========
+// ===== ИСТОРИЯ =====
+app.get('/api/history/:nick', (req, res) => {
+    const bills = loadJSON(path.join(__dirname, 'bills.json'));
+    const t = bills.filter(b => b.from === req.params.nick || b.to === req.params.nick).reverse();
+    res.json({ success: true, transactions: t });
+});
+
+// ===== ЧАТ =====
 app.post('/chat/send', (req, res) => {
     const { nick, message } = req.body;
     const chats = loadChats();
     if (!chats[nick]) chats[nick] = { messages: [], adminReplies: [], waitingOperator: false };
-    chats[nick].messages.push({ from: 'user', text: message, time: new Date().toISOString() });
-    if (chats[nick].waitingOperator) console.log('\n💬 ' + nick + ': ' + message + '\n');
+    chats[nick].messages.push({ from: 'user', text: message });
     saveChats(chats);
     res.json({ success: true, botReply: botReply(message) });
 });
 
 app.get('/chat/messages/:nick', (req, res) => {
     const chats = loadChats();
-    if (!chats[req.params.nick]) return res.json({ success: true, adminReplies: [], closed: false });
-    const replies = chats[req.params.nick].adminReplies || [];
-    const closed = chats[req.params.nick].closed || false;
+    const r = chats[req.params.nick]?.adminReplies || [];
     chats[req.params.nick].adminReplies = [];
-    chats[req.params.nick].closed = false;
     saveChats(chats);
-    res.json({ success: true, adminReplies: replies, closed });
+    res.json({ success: true, adminReplies: r });
 });
 
 app.post('/chat/call-operator', (req, res) => {
     const chats = loadChats();
-    if (!chats[req.body.nick]) chats[req.body.nick] = { messages: [], adminReplies: [], waitingOperator: false };
-    chats[req.body.nick].waitingOperator = true;
+    if (!chats[req.body.nick]) chats[req.body.nick] = { messages: [], adminReplies: [], waitingOperator: true };
+    else chats[req.body.nick].waitingOperator = true;
     saveChats(chats);
-    console.log('\n📞 ВЫЗОВ: ' + req.body.nick + '\n');
     res.json({ success: true });
 });
 
-// ========== API ДЛЯ ТЕРМИНАЛА ДАМЕРА (защищённый) ==========
+// ===== ДАМЕР =====
 const DAMER_KEY = 'damersecret123';
-
-// Проверка ключа
 function checkKey(req, res) {
     const key = req.query.key || (req.body && req.body.key);
-    if (key !== DAMER_KEY) {
-        res.json({ success: false, message: 'Доступ запрещён!' });
-        return false;
-    }
+    if (key !== DAMER_KEY) { res.json({ success: false, message: 'Доступ запрещён!' }); return false; }
     return true;
 }
 
 app.get('/damer-queue-data', (req, res) => {
     if (!checkKey(req, res)) return;
-    const queue = loadQueue();
-    res.json({ success: true, requests: queue.filter(r => !r.shown) });
+    res.json({ success: true, requests: loadQueue().filter(r => !r.shown) });
 });
 
 app.post('/damer-done', (req, res) => {
     if (!checkKey(req, res)) return;
-    const { nick } = req.body;
-    const queue = loadQueue();
-    const newQueue = queue.filter(r => !(r.from === nick));
-    saveQueue(newQueue);
-    console.log('✅ Дамер выполнил: ' + nick);
+    saveQueue(loadQueue().filter(r => r.from !== req.body.nick));
     res.json({ success: true });
 });
 
 app.post('/damer-refund', (req, res) => {
     if (!checkKey(req, res)) return;
-    const { nick, amount } = req.body;
     const users = loadUsers();
-    if (users[nick]) {
-        users[nick].balance += parseInt(amount);
-        saveUsers(users);
-    }
-    const queue = loadQueue();
-    const newQueue = queue.filter(r => !(r.from === nick && r.amount === parseInt(amount)));
-    saveQueue(newQueue);
-    console.log('🔙 Возврат: ' + nick + ' | ♎' + amount);
+    if (users[req.body.nick]) { users[req.body.nick].balance += parseInt(req.body.amount); saveUsers(users); }
+    saveQueue(loadQueue().filter(r => !(r.from === req.body.nick && r.amount === parseInt(req.body.amount))));
     res.json({ success: true });
 });
 
-app.post('/damer-done', (req, res) => {
-    if (req.body.key !== DAMER_KEY) return res.json({ success: false, message: 'Доступ запрещён!' });
-    const { nick } = req.body;
-    const queue = loadQueue();
-    const newQueue = queue.filter(r => !(r.from === nick));
-    saveQueue(newQueue);
-    console.log('✅ Дамер: ' + nick);
-    res.json({ success: true });
-});
-
-app.post('/damer-refund', (req, res) => {
-    if (req.body.key !== DAMER_KEY) return res.json({ success: false, message: 'Доступ запрещён!' });
-    const { nick, amount } = req.body;
+app.post('/unit-transfer-request', (req, res) => {
+    const { from, type, number, amount } = req.body;
     const users = loadUsers();
-    if (users[nick]) {
-        users[nick].balance += parseInt(amount);
-        saveUsers(users);
-    }
-    const queue = loadQueue();
-    const newQueue = queue.filter(r => !(r.from === nick && r.amount === parseInt(amount)));
-    saveQueue(newQueue);
-    console.log('🔙 Возврат: ' + nick + ' | ♎' + amount);
+    if (!users[from]) return res.json({ success: false, message: 'Не найден!' });
+    if (users[from].balance < amount) return res.json({ success: false, message: 'Недостаточно!' });
+    users[from].balance -= amount;
+    saveUsers(users);
+    const q = loadQueue();
+    q.push({ from, type, number, amount, shown: false });
+    saveQueue(q);
     res.json({ success: true });
 });
 
-// ========== ТЕРМИНАЛ ==========
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-
-function prompt() {
-    rl.question('', (line) => {
-        const p = line.trim().split(' ');
-        const cmd = p[0], target = p[1], rest = p.slice(2).join(' ');
-        const users = loadUsers();
-        if (cmd === 'reply' && target && rest) {
-            const chats = loadChats();
-            if (!chats[target]) chats[target] = { messages: [], adminReplies: [], waitingOperator: false };
-            chats[target].adminReplies.push({ text: rest, time: new Date().toISOString() });
-            saveChats(chats);
-            console.log('✅ → ' + target);
-        } else if (cmd === 'give' && target) {
-            const amt = parseInt(rest);
-            if (!users[target]) console.log('❌ Не найден!');
-            else { users[target].balance += amt; saveUsers(users); console.log('✅ +' + amt + ' → ' + target); }
-        } else if (cmd === 'take' && target) {
-            const amt = parseInt(rest);
-            if (!users[target]) console.log('❌ Не найден!');
-            else if (users[target].balance < amt) console.log('❌ Не хватает!');
-            else { users[target].balance -= amt; saveUsers(users); console.log('✅ -' + amt + ' у ' + target); }
-        } else if (cmd === 'ban' && target) {
-            const r = rest.split(' ');
-            if (!users[target]) console.log('❌ Не найден!');
-            else { users[target].banned = true; users[target].banCode = r[0]; users[target].banReason = r.slice(1).join(' ') || 'Нарушение'; saveUsers(users); console.log('🚫 ' + target); }
-        } else if (cmd === 'unban' && target) {
-            if (!users[target]) console.log('❌ Не найден!');
-            else { delete users[target].banned; saveUsers(users); console.log('✅ ' + target); }
-        } else if (cmd === 'users') {
-            for (var u in users) console.log('👤 ' + u + ' | ♎' + users[u].balance);
-        } else if (cmd === 'help') console.log('reply, give, take, ban, unban, users');
-        else if (line.trim()) console.log('❌ help');
-        prompt();
+// ===== ЗАПУСК =====
+(async () => {
+    await loadAllData();
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log('🚀 DKBank запущен!');
     });
-}
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log('🚀 DKBank http://127.0.0.1:' + PORT);
-    prompt();
-});
+})();
