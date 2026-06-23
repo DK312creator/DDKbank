@@ -8,9 +8,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ===== НАСТРОЙКИ GITHUB =====
-const GITHUB_TOKEN = 'СЮДА_ВСТАВЬ_СВОЙ_ТОКЕН'; // ← ЗАМЕНИ НА СВОЙ ТОКЕН
-const GITHUB_USER = 'ТВОЙ_НИК_НА_GITHUB'; // ← ЗАМЕНИ НА СВОЙ НИК
-const GITHUB_REPO = 'dkbank'; // ← ТВОЙ РЕПОЗИТОРИЙ
+const GITHUB_TOKEN = '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'; // ← ЗАМЕНИ НА СВОЙ ТОКЕН
+const GITHUB_USER = 'DK312creator'; // ← ЗАМЕНИ НА СВОЙ НИК
+const GITHUB_REPO = 'DDKbank'; // ← ТВОЙ РЕПОЗИТОРИЙ
 const GITHUB_BRANCH = 'main';
 const DATA_FILES = ['users.json', 'bills.json', 'chats.json', 'damer-queue.json', 'log_info.txt', 'giftcards.json'];
 
