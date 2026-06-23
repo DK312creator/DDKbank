@@ -102,17 +102,15 @@ app.post('/update-profile', (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/transfer', (req, res) => {
-    const { from, to, amount } = req.body;
+app.post('/delete', (req, res) => {
+    const { nick, amount } = req.body;
     const users = loadUsers();
-    if (!users[from]) return res.json({ success: false, message: 'Отправитель не найден!' });
-    if (!users[to]) return res.json({ success: false, message: 'Получатель не найден!' });
-    if (users[from].balance < amount) return res.json({ success: false, message: 'Недостаточно!' });
-    users[from].balance -= amount;
-    users[to].balance += amount;
+    if (!users[nick]) return res.json({ success: false, message: 'Не найден!' });
+    if (users[nick].balance < amount) return res.json({ success: false, message: 'Недостаточно!' });
+    users[nick].balance -= amount;
     saveUsers(users);
     const bills = loadJSON('bills.json');
-    bills.push({ type: 'transfer', from, to, amount, date: new Date().toISOString().replace('T', ' ').slice(0, 19) });
+    bills.push({ type: 'take', from: nick, amount, date: new Date().toISOString().replace('T', ' ').slice(0, 19) });
     saveJSON('bills.json', bills);
     res.json({ success: true });
 });
