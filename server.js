@@ -12,25 +12,21 @@ app.use(express.static(__dirname));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const UPLOADS_FOLDER = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOADS_FOLDER)) {
-    fs.mkdirSync(UPLOADS_FOLDER, { recursive: true });
-}
+if (!fs.existsSync(UPLOADS_FOLDER)) fs.mkdirSync(UPLOADS_FOLDER, { recursive: true });
 
 const storage = multer.diskStorage({
     destination: UPLOADS_FOLDER,
-    filename: function(req, file, cb) {
+    filename: (req, file, cb) => {
         const nick = req.body.nick || 'temp';
-        const ext = path.extname(file.originalname);
-        cb(null, nick + '_avatar' + ext);
+        cb(null, nick + '_avatar' + path.extname(file.originalname));
     }
 });
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
 function loadJSON(filename) {
     try { return JSON.parse(fs.readFileSync(path.join(__dirname, filename), 'utf8')); }
-    catch(e) { return filename === 'bills.json' || filename === 'damer-queue.json' ? [] : {}; }
+    catch(e) { return (filename === 'bills.json' || filename === 'damer-queue.json') ? [] : {}; }
 }
-
 function saveJSON(filename, data) {
     fs.writeFileSync(path.join(__dirname, filename), JSON.stringify(data, null, 2));
 }
@@ -48,7 +44,6 @@ function botReply(msg) {
     return 'Нажмите Служба поддержки.';
 }
 
-// ===== СТРАНИЦЫ =====
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 app.get('/profile', (req, res) => res.sendFile(path.join(__dirname, 'profile.html')));
@@ -57,7 +52,6 @@ app.get('/chat', (req, res) => res.sendFile(path.join(__dirname, 'chathelp_up.ht
 app.get('/payments', (req, res) => res.sendFile(path.join(__dirname, 'payments.html')));
 app.get('/history', (req, res) => res.sendFile(path.join(__dirname, 'history.html')));
 
-// ===== РЕГИСТРАЦИЯ =====
 app.post('/register', (req, res) => {
     const { nick, password } = req.body;
     const users = loadUsers();
@@ -67,7 +61,6 @@ app.post('/register', (req, res) => {
     res.json({ success: true });
 });
 
-// ===== ВХОД =====
 app.post('/login', (req, res) => {
     const { nick, password } = req.body;
     const users = loadUsers();
@@ -77,7 +70,6 @@ app.post('/login', (req, res) => {
     res.json({ success: true, ...users[nick] });
 });
 
-// ===== АВАТАР =====
 app.post('/upload-avatar', upload.single('avatar'), (req, res) => {
     const nick = req.body.nick;
     if (!nick || !req.file) return res.json({ success: false });
@@ -92,7 +84,6 @@ app.post('/upload-avatar', upload.single('avatar'), (req, res) => {
     res.json({ success: true });
 });
 
-// ===== ПРОФИЛЬ =====
 app.get('/api/profile/:nick', (req, res) => {
     const users = loadUsers();
     res.json({ success: !!users[req.params.nick], ...(users[req.params.nick] || {}) });
@@ -111,7 +102,6 @@ app.post('/update-profile', (req, res) => {
     res.json({ success: true });
 });
 
-// ===== ПЕРЕВОД =====
 app.post('/transfer', (req, res) => {
     const { from, to, amount } = req.body;
     const users = loadUsers();
@@ -127,7 +117,6 @@ app.post('/transfer', (req, res) => {
     res.json({ success: true });
 });
 
-// ===== ПОДАРОЧНАЯ КАРТА =====
 app.post('/gift', (req, res) => {
     const { nick, code } = req.body;
     const users = loadUsers();
@@ -141,14 +130,12 @@ app.post('/gift', (req, res) => {
     res.json({ success: true, message: '+' + cards[code].amount + ' ♎' });
 });
 
-// ===== ИСТОРИЯ =====
 app.get('/api/history/:nick', (req, res) => {
     const bills = loadJSON('bills.json');
     const t = bills.filter(b => b.from === req.params.nick || b.to === req.params.nick).reverse();
     res.json({ success: true, transactions: t });
 });
 
-// ===== ЧАТ =====
 app.post('/chat/send', (req, res) => {
     const { nick, message } = req.body;
     const chats = loadChats();
@@ -166,7 +153,6 @@ app.get('/chat/messages/:nick', (req, res) => {
     res.json({ success: true, adminReplies: r });
 });
 
-// ===== ДАМЕР =====
 const DAMER_KEY = 'damersecret123';
 
 app.get('/damer-queue-data', (req, res) => {
@@ -204,7 +190,6 @@ app.post('/unit-transfer-request', (req, res) => {
     res.json({ success: true });
 });
 
-// ===== ЗАПУСК =====
 app.listen(PORT, '0.0.0.0', () => {
-    console.log('🚀 DKBank запущен на порту ' + PORT);
+    console.log('🚀 DKBank на порту ' + PORT);
 });
